@@ -1,7 +1,6 @@
 require "digest"
 require_dependency "new_post_manager"
 require_dependency "post_action_creator"
-require_dependency "html_to_markdown"
 require_dependency "plain_text_to_markdown"
 require_dependency "upload_creator"
 
@@ -277,7 +276,7 @@ module Email
           doc = Nokogiri::HTML.fragment(html)
           self.send(:"extract_from_#{html_extracter[0]}", doc)
         else
-          markdown = HtmlToMarkdown.new(html, keep_img_tags: true, keep_cid_imgs: true).to_markdown
+          markdown = PrettyText.html_to_markdown(html)
           markdown = trim_discourse_markers(markdown)
           trim_reply_and_extract_elided(markdown)
         end
@@ -291,8 +290,8 @@ module Email
     end
 
     def to_markdown(html, elided_html)
-      markdown = HtmlToMarkdown.new(html, keep_img_tags: true, keep_cid_imgs: true).to_markdown
-      [EmailReplyTrimmer.trim(markdown), HtmlToMarkdown.new(elided_html).to_markdown]
+      markdown = PrettyText.html_to_markdown(html)
+      [EmailReplyTrimmer.trim(markdown), PrettyText.html_to_markdown(elided_html)]
     end
 
     HTML_EXTRACTERS ||= [

@@ -11,3 +11,5 @@
 //= require ./pretty-text/oneboxer
 //= require ./pretty-text/inline-oneboxer
 //= require ./pretty-text/image-short-url
+//= require ./discourse/helpers/parse-html
+//= require ./discourse/lib/to-markdown

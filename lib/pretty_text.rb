@@ -82,8 +82,6 @@ module PrettyText
     ctx_load_manifest(ctx, "markdown-it-bundle.js")
     root_path = "#{Rails.root}/app/assets/javascripts/"
 
-    apply_es6_file(ctx, root_path, "discourse/helpers/parse-html")
-    apply_es6_file(ctx, root_path, "discourse/lib/to-markdown")
     apply_es6_file(ctx, root_path, "discourse/lib/utilities")
 
     PrettyText::Helpers.instance_methods.each do |method|
@@ -343,20 +341,20 @@ module PrettyText
     fragment.to_html
   end
 
- # Given a Nokogiri doc, convert all links to absolute
- def self.make_all_links_absolute(doc)
-   site_uri = nil
-   doc.css("a").each do |link|
-     href = link["href"].to_s
-     begin
-       uri = URI(href)
-       site_uri ||= URI(Discourse.base_url)
-       link["href"] = "#{site_uri}#{link['href']}" unless uri.host.present?
-     rescue URI::InvalidURIError, URI::InvalidComponentError
-       # leave it
-     end
-   end
- end
+  # Given a Nokogiri doc, convert all links to absolute
+  def self.make_all_links_absolute(doc)
+    site_uri = nil
+    doc.css("a").each do |link|
+      href = link["href"].to_s
+      begin
+        uri = URI(href)
+        site_uri ||= URI(Discourse.base_url)
+        link["href"] = "#{site_uri}#{link['href']}" unless uri.host.present?
+      rescue URI::InvalidURIError, URI::InvalidComponentError
+        # leave it
+      end
+    end
+  end
 
   def self.strip_image_wrapping(doc)
     doc.css(".lightbox-wrapper .meta").remove
@@ -368,6 +366,13 @@ module PrettyText
     strip_image_wrapping(doc)
     make_all_links_absolute(doc)
     doc.to_html
+  end
+
+  def self.html_to_markdown(html)
+    protect do
+      ctx_load(v8, "vendor/assets/javascripts/htmlparser.js")
+      v8.eval("__htmlToMarkdown(#{html.inspect})")
+    end
   end
 
   protected

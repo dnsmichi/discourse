@@ -1,12 +1,7 @@
-require_dependency 'html_to_markdown'
-
 class ComposerController < ApplicationController
-
   requires_login
 
   def parse_html
-    markdown_text = HtmlToMarkdown.new(params[:html]).to_markdown
-
-    render json: { markdown: markdown_text }
+    render json: { markdown: PrettyText.html_to_markdown(params[:html]) }
   end
 end

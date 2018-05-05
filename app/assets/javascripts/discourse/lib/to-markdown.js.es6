@@ -15,11 +15,11 @@ class Tag {
 
   decorate(text) {
     if (this.prefix || this.suffix) {
-      text = [this.prefix, text, this.suffix].join("");
+      text = `${this.prefix}${text}${this.suffix}`;
     }
 
     if (this.inline) {
-      text = " " + text + " ";
+      text = ` ${text} `;
     }
 
     return text;
@@ -36,8 +36,8 @@ class Tag {
   }
 
   static blocks() {
-    return ["address", "article", "aside", "dd", "div", "dl", "dt", "fieldset", "figcaption", "figure",
-            "footer", "form", "header", "hgroup", "hr", "main", "nav", "p", "pre", "section"];
+    return ["address", "article", "aside", "dd", "div", "dl", "dt", "fieldset", "figcaption", "figure", "footer",
+            "header", "hgroup", "main", "nav", "p", "section"];
   }
 
   static headings() {
@@ -52,8 +52,12 @@ class Tag {
     return ["dt", "dd", "thead", "tbody", "tfoot"];
   }
 
+  static whitelisted() {
+    return ["big", "del", "ins", "kbd", "small", "sub", "sup"];
+  }
+
   static trimmable() {
-    return [...Tag.blocks(), ...Tag.headings(), ...Tag.slices(), "li", "td", "th", "br", "hr", "blockquote", "table", "ol", "tr", "ul"];
+    return [...Tag.blocks(), ...Tag.headings(), ...Tag.slices(), "pre", "li", "td", "th", "br", "hr", "blockquote", "table", "ol", "tr", "ul"];
   }
 
   static block(name, prefix, suffix) {
@@ -70,8 +74,7 @@ class Tag {
   }
 
   static heading(name, i) {
-    const prefix = `${[...Array(i)].map(() => "#").join("")} `;
-    return Tag.block(name, prefix, "");
+    return Tag.block(name, `${Array(i + 1).join("#")} `, "");
   }
 
   static emphasis(name, decorator) {
@@ -81,7 +84,7 @@ class Tag {
       }
 
       decorate(text) {
-        if (text.includes("\n")) {
+        if (text.includes("\n\n")) {
           this.prefix = `<${this.name}>`;
           this.suffix = `</${this.name}>`;
         }
@@ -128,10 +131,39 @@ class Tag {
 
         if (attr.href && text !== attr.href) {
           text = text.replace(/\n{2,}/g, "\n");
-          return "[" + text + "](" + attr.href + ")";
+          return `[${text}](${attr.href})`;
         }
 
         return text;
+      }
+    };
+  }
+
+  static br() {
+    return class extends Tag {
+      constructor() {
+        super("br", "", "", true);
+      }
+
+      toMarkdown() {
+        if (!this.element.previous || !this.element.next) {
+          const parent = this.element.parent;
+          return parent && ["em", "i", "b", "strong"].includes(parent.name) ? "" : "\n";
+        }
+        return "\n";
+      }
+    };
+  }
+
+  static abbr() {
+    return class extends Tag {
+      constructor() {
+        super("abbr", "", "", true);
+      }
+
+      decorate(text) {
+        const title = this.element.attributes.title;
+        return title ? `<abbr title="${title}">${text}</abbr>` : `<abbr>${text}</abbr>`;
       }
     };
   }
@@ -146,19 +178,24 @@ class Tag {
         const e = this.element;
         const attr = e.attributes;
         const pAttr = (e.parent && e.parent.attributes) || {};
+        const width = attr.width || pAttr.width;
+        const height = attr.height || pAttr.height;
+        const style = attr.style || pAttr.style;
         const src = attr.src || pAttr.src;
+
+        if (0 === parseInt(width) || 0 === parseInt(height) || /(width|height)\s*:\s*0/.test(style)) {
+          return "";
+        }
 
         if (src) {
           let alt = attr.alt || pAttr.alt || "";
-          const width = attr.width || pAttr.width;
-          const height = attr.height || pAttr.height;
 
           if (width && height) {
             const pipe = this.element.parentNames.includes("table") ? "\\|" : "|";
             alt = `${alt}${pipe}${width}x${height}`;
           }
 
-          return "![" + alt + "](" + src + ")";
+          return `![${alt}](${src})`;
         }
 
         return "";
@@ -190,7 +227,7 @@ class Tag {
       toMarkdown() {
         const text = this.element.innerMarkdown().trim();
 
-        if(text.includes("\n")) {  // Unsupported format inside Markdown table cells
+        if (text.includes("\n")) {  // Unsupported format inside Markdown table cells
           let e = this.element;
           while(e = e.parent) {
             if (e.name === "table") {
@@ -229,6 +266,22 @@ class Tag {
     };
   }
 
+  static pre() {
+    return class extends Tag {
+      constructor() {
+        super("pre", "\n\n```\n", "\n```\n\n");
+      }
+
+      decorate(text) {
+        if (this.element.children && this.element.children[0].name === "code") {
+          this.prefix = "";
+          this.suffix = "";
+        }
+        return super.decorate(text);
+      }
+    };
+  }
+
   static code() {
     return class extends Tag {
       constructor() {
@@ -237,24 +290,21 @@ class Tag {
 
       decorate(text) {
         if (this.element.parentNames.includes("pre")) {
-          this.prefix = '\n\n```\n';
-          this.suffix = '\n```\n\n';
+          const matches = /lang-(\w+)/.exec(this.element.attributes.class);
+          const language = matches && matches.length >= 1 && matches[1];
+          this.prefix = "\n\n```" + (language || "") + "\n";
+          this.suffix = "\n```\n\n";
         } else {
           this.inline = true;
         }
 
-        text = $('<textarea />').html(text).text();
         return super.decorate(text);
       }
     };
   }
 
   static blockquote() {
-    return class extends Tag {
-      constructor() {
-        super("blockquote", "\n> ", "\n");
-      }
-
+    return class extends Tag.block("blockquote", "\n> ", "\n") {
       decorate(text) {
         text = text.trim().replace(/\n{2,}>/g, "\n>").replace(/\n/g, "\n> ");
         return super.decorate(text);
@@ -341,18 +391,31 @@ class Tag {
       }
     };
   }
-
 }
 
 const tags = [
-  ...Tag.blocks().map((b) => Tag.block(b)),
+  ...Tag.blocks().map(b => Tag.block(b)),
   ...Tag.headings().map((h, i) => Tag.heading(h, i + 1)),
-  ...Tag.slices().map((s) => Tag.slice(s, "\n")),
-  ...Tag.emphases().map((e) => Tag.emphasis(e[0], e[1])),
-  Tag.cell("td"), Tag.cell("th"),
-  Tag.replace("br", "\n"), Tag.replace("hr", "\n---\n"), Tag.replace("head", ""),
-  Tag.keep("ins"), Tag.keep("del"), Tag.keep("small"), Tag.keep("big"),
-  Tag.li(), Tag.link(), Tag.image(), Tag.code(), Tag.blockquote(), Tag.table(), Tag.tr(), Tag.ol(), Tag.list("ul"),
+  ...Tag.slices().map(s => Tag.slice(s, "\n")),
+  ...Tag.emphases().map(e => Tag.emphasis(e[0], e[1])),
+  ...Tag.whitelisted().map(w => Tag.keep(w)),
+  Tag.abbr(),
+  Tag.blockquote(),
+  Tag.br(),
+  Tag.cell("td"),
+  Tag.cell("th"),
+  Tag.code(),
+  Tag.image(),
+  Tag.li(),
+  Tag.link(),
+  Tag.list("ul"),
+  Tag.ol(),
+  Tag.pre(),
+  Tag.replace("hr", "\n\n---\n\n"),
+  Tag.replace("script", ""),
+  Tag.replace("style", ""),
+  Tag.table(),
+  Tag.tr(),
 ];
 
 class Element {
@@ -416,6 +479,9 @@ class Element {
   }
 
   toMarkdown() {
+    if (/display\s*:\s*none/.test(this.attributes.style)) {
+      return "";
+    }
     switch(this.type) {
       case "text":
         return this.text();
@@ -472,17 +538,16 @@ function trimUnwanted(html) {
 }
 
 function putPlaceholders(html) {
-  const codeRegEx = /<code[^>]*>([\s\S]*?)<\/code>/gi;
+  const codeRegEx = /<code([^>]*)>([\s\S]*?)<\/code>/gi;
   const origHtml = html;
   let match = codeRegEx.exec(origHtml);
   let placeholders = [];
 
   while(match) {
     const placeholder = `DISCOURSE_PLACEHOLDER_${placeholders.length + 1}`;
-    let code = match[1];
-    code = $('<div />').html(code).text().replace(/^\n/, '').replace(/\n$/, '');
+    const code = match[2].replace(/^\n/, '').replace(/\n$/, '');
     placeholders.push([placeholder, code]);
-    html = html.replace(match[0], `<code>${placeholder}</code>`);
+    html = html.replace(match[0], `<code${match[1]}>${placeholder}</code>`);
     match = codeRegEx.exec(origHtml);
   }
 

@@ -319,7 +319,7 @@ class ImportScripts::JiveApi < ImportScripts::Base
 
     html = doc.at(".jive-rendered-content").to_html
 
-    HtmlToMarkdown.new(html, keep_img_tags: true).to_markdown
+    PrettyText.html_to_markdown(html)
   end
 
   def mark_topics_as_solved

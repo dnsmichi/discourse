@@ -18,7 +18,7 @@ QUnit.test("converts inline nested styles", assert => {
   html = `<i class="fa">Italicised line
    with <b title="strong">some<br>
    random</b> <s>bold</s> words.</i>`;
-  markdown = `<i>Italicised line with <b>some\nrandom</b> ~~bold~~ words.</i>`;
+  markdown = `*Italicised line with **some\nrandom** ~~bold~~ words.*`;
   assert.equal(toMarkdown(html), markdown);
 });
 
@@ -104,7 +104,7 @@ QUnit.test("converts table tags", assert => {
       <tbody>
         <tr><td>Lorem</td><td>ipsum</td></tr>
         <tr><td><b>dolor</b></td> <td><i>sit amet</i></td> </tr>
-        
+
         </tbody>
 </table>
   `;
@@ -218,7 +218,7 @@ QUnit.test("converts blockquote tag", assert => {
   assert.equal(toMarkdown(html), output);
 
   html = "<blockquote>\nLorem ipsum\n<blockquote><p>dolor <blockquote>sit</blockquote> amet</p></blockquote></blockquote>";
-  output = "> Lorem ipsum\n> > dolor\n> > > sit\n> > amet";
+  output = "> Lorem ipsum\n> > dolor\n> > > sit\n> >\n> >\n> > amet";
   assert.equal(toMarkdown(html), output);
 });
 
@@ -285,4 +285,174 @@ QUnit.test("converts list tag from word", assert => {
   <!--EndFragment-->List`;
   const markdown = `Sample\n\n* **Item 1**\n  * *Item 2*\n    * Item 3\n* Item 4\n\nList`;
   assert.equal(toMarkdown(html), markdown);
+});
+
+QUnit.test("remove whitespaces", assert => {
+  assert.equal(toMarkdown(`
+    <div dir="auto">Hello,
+      <div dir="auto"><br></div>
+      <div dir="auto">&nbsp; &nbsp; This is the 1st paragraph.&nbsp; &nbsp; </div>
+      <div dir="auto"><br></div>
+      <div dir="auto">
+        &nbsp; &nbsp; &nbsp; &nbsp; This is another paragraph
+      </div>
+    </div>
+  `), "Hello,\n\nThis is the 1st paragraph.\n\nThis is another paragraph");
+});
+
+QUnit.test("skips hidden tags", assert => {
+  assert.equal(toMarkdown(`<p>Hello <span style="display: none">cruel </span>World!</p>`), "Hello World!");
+});
+
+QUnit.test("skips hidden <img>", assert => {
+  assert.equal(toMarkdown(`<img src="https://www.discourse.org/logo.svg" width=0>`), "");
+  assert.equal(toMarkdown(`<img src="https://www.discourse.org/logo.svg" height="0">`), "");
+  assert.equal(toMarkdown(`<img src="https://www.discourse.org/logo.svg" style="width: 0">`), "");
+  assert.equal(toMarkdown(`<img src="https://www.discourse.org/logo.svg" style="height:0px">`), "");
+});
+
+QUnit.test("converts <code>", assert => {
+  assert.equal(toMarkdown("<code>Code</code>"), "`Code`");
+});
+
+QUnit.test("supports <ins>", assert => {
+  assert.equal(toMarkdown("This is an <ins>insertion</ins>"), "This is an <ins>insertion</ins>");
+});
+
+QUnit.test("supports <del>", assert => {
+  assert.equal(toMarkdown("This is a <del>deletion</del>"), "This is a <del>deletion</del>");
+});
+
+QUnit.test("supports <sub>", assert => {
+  assert.equal(toMarkdown("H<sub>2</sub>O"), "H<sub>2</sub>O");
+});
+
+QUnit.test("supports <sup>", assert => {
+  assert.equal(toMarkdown("<sup>Super Script!</sup>"), "<sup>Super Script!</sup>");
+});
+
+QUnit.test("supports <small>", assert => {
+  assert.equal(toMarkdown("<small>Small</small>"), "<small>Small</small>");
+});
+
+QUnit.test("supports <kbd>", assert => {
+  assert.equal(toMarkdown("<kbd>CTRL</kbd>+<kbd>C</kbd>"), "<kbd>CTRL</kbd>+<kbd>C</kbd>");
+});
+
+QUnit.test("supports <abbr>", assert => {
+  assert.equal(toMarkdown(`<abbr title="Civilized Discourse Construction Kit, Inc.">CDCK</abbr>`), `<abbr title="Civilized Discourse Construction Kit, Inc.">CDCK</abbr>`);
+});
+
+QUnit.test("supports <blockquote>", assert => {
+  assert.equal(toMarkdown("<blockquote>Quote</blockquote>"), "> Quote");
+});
+
+QUnit.test("supports <p> inside <li>", assert => {
+  assert.equal(toMarkdown("<ul><li><p>🍏</p></li><li><p>🍐</p></li><li><p>🍌</p></li></ul>"), "* 🍏\n\n* 🍐\n\n* 🍌");
+});
+
+QUnit.test("supports <ul> inside <ul>", assert => {
+  assert.equal(toMarkdown(`
+      <ul>
+        <li>Fruits
+            <ul>
+                <li>🍏</li>
+                <li>🍐</li>
+                <li>🍌</li>
+            </ul>
+        </li>
+        <li>Vegetables
+            <ul>
+                <li>🍆</li>
+                <li>🍅</li>
+                <li>🍄</li>
+            </ul>
+        </li>
+      </ul>
+    `), "* Fruits\n  * 🍏\n  * 🍐\n  * 🍌\n* Vegetables\n  * 🍆\n  * 🍅\n  * 🍄");
+});
+
+QUnit.test("supports bare <li>", assert => {
+  assert.equal(toMarkdown("<li>I'm alone</li>"), "* I'm alone");
+});
+
+QUnit.test("supports <pre>", assert => {
+  assert.equal(toMarkdown("<pre>var foo = 'bar';</pre>"), "```\nvar foo = 'bar';\n```");
+  assert.equal(toMarkdown("<pre><code>var foo = 'bar';</code></pre>"), "```\nvar foo = 'bar';\n```");
+  assert.equal(toMarkdown(`<pre><code class="lang-javascript">var foo = 'bar';</code></pre>`), "```javascript\nvar foo = 'bar';\n```");
+});
+
+QUnit.test("supports <pre> inside <blockquote>", assert => {
+  assert.equal(toMarkdown("<blockquote><pre><code>var foo = 'bar';</code></pre></blockquote>"), "> ```\n> var foo = 'bar';\n> ```");
+});
+
+QUnit.test("works", assert => {
+  assert.equal(
+    toMarkdown("<ul><li><p>A list item with a blockquote:</p><blockquote><p>This is a <strong>blockquote</strong><br>inside a list item.</p></blockquote></li></ul>"),
+    "- A list item with a blockquote:\n\n  > This is a **blockquote**\n  > inside a list item."
+  );
+});
+
+QUnit.test("supports html document", assert => {
+  assert.equal(toMarkdown("<html><body>Hello<div>World</div></body></html>"), "Hello\n\nWorld");
+});
+
+QUnit.test("removes <script>", assert => {
+  assert.equal(toMarkdown("<script>var foo = 'bar'</script>"), "");
+});
+
+QUnit.test("removes <style>", assert => {
+  assert.equal(toMarkdown("<style>* { margin: 0 }</style>"), "");
+});
+
+QUnit.test("handles divs within spans", assert => {
+  assert.equal(toMarkdown("<div>1st paragraph<span><div>2nd paragraph</div></span></div>"), "1st paragraph\n\n2nd paragraph");
+});
+
+QUnit.test("handles <strong> with an oddly placed <br>", assert => {
+  assert.equal(toMarkdown("<strong><br>Bold</strong>"), "**Bold**");
+  assert.equal(toMarkdown("<strong>Bold<br></strong>"), "**Bold**");
+  assert.equal(toMarkdown("<strong>Bold<br>text</strong>"), "**Bold\ntext**");
+});
+
+QUnit.test("handles <em> with an oddly placed <br>", assert => {
+  assert.equal(toMarkdown("<em><br>Italic</em>"), "*Italic*");
+  assert.equal(toMarkdown("<em>Italic<br></em>"), "*Italic*");
+  assert.equal(toMarkdown("<em>Italic<br>text</em>"), "*Italic\ntext*");
+});
+
+QUnit.test("handles <strong> with an empty tag", assert => {
+  assert.equal(toMarkdown("<strong></strong>"), "");
+  assert.equal(toMarkdown("<strong>   </strong>"), "");
+  assert.equal(toMarkdown("Some<strong> </strong>text"), "Some text");
+  assert.equal(toMarkdown("Some<strong>    </strong>text"), "Some text");
+});
+
+QUnit.test("handles <em> with an empty tag", assert => {
+  assert.equal(toMarkdown("<em></em>"), "");
+  assert.equal(toMarkdown("<em>   </em>"), "");
+  assert.equal(toMarkdown("Some<em> </em>text"), "Some text");
+  assert.equal(toMarkdown("Some<em>    </em>text"), "Some text");
+});
+
+QUnit.test("handles <strong> with spaces around text", assert => {
+  assert.equal(toMarkdown("<strong> Bold</strong>"), "**Bold**");
+  assert.equal(toMarkdown("<strong>     Bold</strong>"), "**Bold**");
+  assert.equal(toMarkdown("<strong>Bold </strong>"), "**Bold**");
+  assert.equal(toMarkdown("<strong>Bold     </strong>"), "**Bold**");
+  assert.equal(toMarkdown("Some<strong> bold</strong> text"), "Some **bold** text");
+  assert.equal(toMarkdown("Some<strong>     bold</strong> text"), "Some **bold** text");
+  assert.equal(toMarkdown("Some <strong>bold </strong>text"), "Some **bold** text");
+  assert.equal(toMarkdown("Some <strong>bold     </strong>text"), "Some **bold** text");
+});
+
+QUnit.test("handles <em> with spaces around text", assert => {
+  assert.equal(toMarkdown("<em> Italic</em>"), "*Italic*");
+  assert.equal(toMarkdown("<em>     Italic</em>"), "*Italic*");
+  assert.equal(toMarkdown("<em>Italic </em>"), "*Italic*");
+  assert.equal(toMarkdown("<em>Italic     </em>"), "*Italic*");
+  assert.equal(toMarkdown("Some<em> italic</em> text"), "Some *italic* text");
+  assert.equal(toMarkdown("Some<em>     italic</em> text"), "Some *italic* text");
+  assert.equal(toMarkdown("Some <em>italic </em>text"), "Some *italic* text");
+  assert.equal(toMarkdown("Some <em>italic     </em>text"), "Some *italic* text");
 });
